@@ -1,0 +1,110 @@
+#!/bin/sh
+
+__cmd_name=$(basename $0)
+
+
+# ========== Helper Functions ==========
+
+__print_usage()
+{
+	cat <<- EOT
+	USAGE:
+	    ${__cmd_name} --file <path> [--id | --count] <name>
+
+	DESCRIPTION:
+	    Parses and prints subids.
+
+	OPTIONS:
+	    -f, --file <path>
+	        File to look up subids in.
+
+	    --id
+	        Print subid only.
+
+	    --count
+	        Print count of subids.
+
+	ARGUMENTS:
+	    <name>
+	        Name of the user/group for ID lookup.
+
+	EOT
+}
+
+
+# ========== Script's Begin ==========
+
+. emucon-init.sh
+
+if [ $# -eq 0 ] ; then
+	__print_usage
+	emucon_exit
+fi
+
+# Parse script's command line arguments
+longopts='file:,id,count,help'
+cmdargs=$(emucon_parse_cmdargs -s 'f:,h' -l "${longopts}" -- "$@")
+if emucon_cmd_failed; then
+	emucon_abort
+fi
+
+# Lookup parsed parameters and their arguments
+eval set -- ${cmdargs}
+while true ; do
+	case "$1" in
+		-f|--file)
+			subids="$2"
+			shift 2 ;;
+		--id)
+			cutfn=2
+			shift 1 ;;
+		--count)
+			cutfn=3
+			shift 1 ;;
+		-h|--help)
+			__print_usage
+			emucon_exit ;;
+		--)
+			shift 1
+			break ;;
+		*)
+			emucon_print_invalid_cmdargs_error "${cmdargs}"
+			emucon_abort ;;
+	esac
+done
+
+
+name="$1"
+
+if [ -z "${cutfn}" ] ; then
+	# Print id:count
+	cutfn="2,3"
+fi
+
+# Check required parameters
+emucon_check_required_arg '-f/--file' "${subids}"
+emucon_check_required_arg '<name>' "${name}"
+
+if [ ! -f "${subids}" ] ; then
+	emucon_print_error "Specified file does not exist: ${subids}"
+	emucon_abort -v
+fi
+
+# Look up the entry
+entry=$(cat "${subids}" | grep "${name}")
+if [ -z "${entry}" ] ; then
+	emucon_print_error "No entry found for '${name}'!"
+	emucon_abort -v
+fi
+
+# Expected entry format:
+# name:id:count
+output=$(echo "${entry}" | cut -s -f "${cutfn}" -d ":")
+if [ -z "${output}" ] ; then
+	emucon_print_error 'Parsing entry failed!'
+	emucon_print_error "${entry}"
+	emucon_abort -v
+fi
+
+echo "${output}"
+
