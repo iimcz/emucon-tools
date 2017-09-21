@@ -1,0 +1,87 @@
+#!/bin/sh
+
+__cmd_name=$(basename $0)
+
+
+# ========== Helper Functions ==========
+
+__print_usage()
+{
+	cat <<- EOT
+	USAGE:
+	    ${__cmd_name} <name>
+
+	DESCRIPTION:
+	    Prints full path for specified emucon's file.
+
+	ARGUMENTS:
+	    <name>
+	        helpers.sh - Path to the helpers script.
+
+	EOT
+}
+
+__ensure_exists()
+{
+	local path
+	path="$1"
+
+	# File or directory exists?
+	if [ ! -e "${path}" ] ; then
+		emucon_print_error "Could not find ${path}"
+		emucon_print_error 'Unexpected directory layout!'
+		emucon_abort -v
+	fi
+}
+
+
+# ========== Script's Begin ==========
+
+basedir=$(dirname $(readlink -f "$0"))
+basedir=$(readlink -f "${basedir}/..")
+impldir="${basedir}/lib/emucon"
+
+# Import helper functions
+helpers="${impldir}/helpers.sh"
+. "${helpers}"
+
+if [ $# -eq 0 ] ; then
+	__print_usage
+	emucon_exit
+fi
+
+# Parse script's command line arguments
+cmdargs=$(emucon_parse_cmdargs -s 'h' -l 'help' -- "$@")
+if emucon_cmd_failed ; then
+	emucon_abort
+fi
+
+# Reset positional args
+eval set -- ${cmdargs}
+while true ; do
+	case "$1" in
+		-h|--help)
+			__print_usage
+			emucon_exit ;;
+		--)
+			shift 1
+			break ;;
+		*)
+			emucon_print_invalid_cmdargs_error "${cmdargs}"
+			emucon_abort ;;
+	esac
+done
+
+# Look up requested path
+case "$1" in
+	helpers.sh)
+		path="${impldir}/$1" ;;
+	*)
+		emucon_print_error "Invalid argument: $1"
+		emucon_abort -v ;;
+esac
+
+# Print requested path
+__ensure_exists "${path}"
+echo "${path}"
+
