@@ -1,0 +1,154 @@
+#!/bin/sh
+
+__cmd_name=$(basename $0)
+
+
+# ========== Helper Functions ==========
+
+__print_usage()
+{
+	cat <<- EOT
+	USAGE:
+	    ${__cmd_name} -w <path> -l <path> -u <path> -c <id>
+
+	DESCRIPTION:
+	    Creates and runs a runc-container.
+
+	OPTIONS:
+	    -w, --working-dir <path>
+	        Container's working directory.
+
+	    -l, --lower-dir <path>[:<path>...]
+	        Lower directory for the overlayfs.
+
+	    -u, --upper-dir <path>
+	        Upper directory for the overlayfs.
+
+	    -c, --container-id <id>
+	        ID to use for runc-container.
+
+	    --cleanup
+	        Cleanup and remove working-dir when done.
+
+	    --non-interactive
+	        Avoid prompting the user for password when executing privileged commands.
+	        For this to work, sudo must be configured accordingly (see README).
+
+	EOT
+}
+
+
+# ========== Script's Begin ==========
+
+. emucon-init.sh
+
+if [ $# -eq 0 ]; then
+	__print_usage
+	emucon_exit
+fi
+
+# Check external dependencies
+emucon_ensure_is_installed 'runc'
+
+# Parse script's command line arguments
+shortopts='w:l:u:c:e:h'
+longopts='working-dir:,lower-dir:,upper-dir:,container-id:,cleanup,non-interactive,help'
+cmdargs=$(emucon_parse_cmdargs -s "${shortopts}" -l "${longopts}" -- "$@")
+if emucon_cmd_failed ; then
+	emucon_abort
+fi
+
+# Lookup parsed parameters and their arguments
+eval set -- ${cmdargs}
+while true ; do
+	case "$1" in
+		-w|--working-dir)
+			workdir="$2"
+			shift 2 ;;
+		-l|--lower-dir)
+			ldir="$2"
+			shift 2 ;;
+		-u|--upper-dir)
+			udir="$2"
+			shift 2 ;;
+		-c|--container-id)
+			cid="$2"
+			shift 2 ;;
+		--cleanup)
+			cleanup='y'
+			shift 1 ;;
+		--non-interactive)
+			interactive='n'
+			shift 1 ;;
+		-h|--help)
+			__print_usage
+			emucon_exit ;;
+		--)
+			shift
+			break ;;
+		*)
+			emucon_print_invalid_cmdargs_error "${cmdargs}"
+			emucon_abort -v ;;
+	esac
+done
+
+# Check required parameters
+emucon_check_required_arg '-w/--working-dir' "${workdir}"
+emucon_check_required_arg '-l/--lower-dir' "${ldir}"
+emucon_check_required_arg '-u/--upper-dir' "${udir}"
+emucon_check_required_arg '-c/--container-id' "${cid}"
+
+# Check directories
+emucon_ensure_dir_exists "${workdir}"
+emucon_ensure_dir_exists "${udir}"
+for dir in $(echo "${ldir}" | tr ':' '\n') ; do
+	emucon_ensure_dir_exists "${dir}"
+done
+
+# Interactive mode
+if [ "${interactive:=y}" = 'y' ] ; then
+	emucon_print_info 'Running in interactive mode...'
+else
+	emucon_print_info 'Running in non-interactive mode...'
+	sopts='--non-interactive'
+fi
+
+emucon_print_info "Preparing working directory: ${workdir}"
+cd "${workdir}"
+mdir="${workdir}/rootfs"
+wdir="${workdir}/workfs"
+mkdir -p "${mdir}"
+mkdir -p "${wdir}"
+
+# Helper, responsible for cleanup
+__cleanup()
+{
+	# Save current exit-code
+	exitcode="$?"
+
+	emucon_print_info 'Cleaning up working directory...'
+	sudo ${sopts} -- umount -v "${mdir}"
+	if [ "${cleanup}" = 'y' ] ; then
+		# Remove working-dir
+		sudo ${sopts} -- rm -v -r "${workdir}"
+	else
+		# Remove only created files/dirs
+		sudo ${sopts} -- rm -v -r "${mdir}"
+		sudo ${sopts} -- rm -v -r "${wdir}"
+	fi
+
+	# Return the process' exit-code
+	exit "${exitcode}"
+}
+
+# Setup an exit-trap
+trap __cleanup EXIT QUIT INT TERM
+
+emucon_print_info 'Setting up overlayfs...'
+mopts="lowerdir=${ldir},upperdir=${udir},workdir=${wdir}"
+sudo ${sopts} -- mount -t overlay overlay -o ${mopts} "${mdir}" || emucon_abort -v
+
+emucon_print_info "Starting container ${cid}..."
+sudo ${sopts} -- runc --debug run "${cid}" || emucon_abort -v
+emucon_print_info "Container ${cid} stopped."
+
