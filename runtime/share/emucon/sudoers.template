@@ -1,0 +1,23 @@
+#
+# Privileged commands for emucon-tools,
+# required to be run without password
+#
+
+# Allowed mount/umount calls
+Cmnd_Alias MOUNT_COMMANDS = /bin/mount -t overlay *, \
+                            /bin/umount
+
+
+# Allowed rm command calls
+Cmnd_Alias RM_COMMANDS = /bin/rm -[rv] -[rv] /tmp/eaas-*, \
+                         /bin/rm -[rv] /tmp/eaas-*, \
+                         /bin/rm /tmp/eaas-*
+
+
+# Allowed runc command calls
+Cmnd_Alias RUNC_COMMANDS = {{install-dir}}/bin/runc --* run *, \
+                           {{install-dir}}/bin/runc run *
+
+
+{{user}}  ALL = NOPASSWD: MOUNT_COMMANDS, RUNC_COMMANDS, RM_COMMANDS
+

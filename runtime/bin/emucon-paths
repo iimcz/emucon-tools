@@ -17,6 +17,7 @@ __print_usage()
 	ARGUMENTS:
 	    <name>
 	        helpers.sh - Path to the helpers script.
+	        sudoers.template - Path to the sudoers template.
 
 	EOT
 }
@@ -40,6 +41,7 @@ __ensure_exists()
 basedir=$(dirname $(readlink -f "$0"))
 basedir=$(readlink -f "${basedir}/..")
 impldir="${basedir}/lib/emucon"
+sharedir="${basedir}/share/emucon"
 
 # Import helper functions
 helpers="${impldir}/helpers.sh"
@@ -76,6 +78,8 @@ done
 case "$1" in
 	helpers.sh)
 		path="${impldir}/$1" ;;
+	sudoers.template)
+		path="${sharedir}/$1" ;;
 	*)
 		emucon_print_error "Invalid argument: $1"
 		emucon_abort -v ;;

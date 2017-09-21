@@ -1,0 +1,196 @@
+#!/bin/sh
+
+__cmd_name=$(basename $0)
+
+# Default install directory
+readonly default_dstdir='/usr/local'
+
+
+# ========== Helper Functions ==========
+
+__print_usage()
+{
+	cat <<- EOT
+	USAGE:
+	    ${__cmd_name} [<options>] <source> [<dest>]
+
+	DESCRIPTION:
+	    Installs emucon-tools from one directory into the other.
+
+	ARGUMENTS:
+	    <source>
+	        Path to install files from.
+
+	    <dest>
+	        Path to install into. (default: ${default_dstdir})
+
+	OPTIONS:
+	    -s, --symlink
+	        Use symbolic links instead of file copies.
+
+	    -c, --cleanup
+	        Remove installed tools from <dest>.
+
+	    -y, --assume-yes
+	        Do not ask when removing tools from <dest>.
+
+	EOT
+}
+
+__list_base_dirs()
+{
+	local srcdir
+	srcdir="$1"
+
+	find "${srcdir}" -mindepth 1 -maxdepth 1 -type d
+}
+
+__list_source_dirs()
+{
+	local srcdir
+	srcdir="$1"
+
+	find "${srcdir}" -mindepth 2 -maxdepth 2 -type d
+}
+
+__list_source_files()
+{
+	local maxdepth
+	local srcdir
+
+	# Recursive lookup requested?
+	if [ "$1" = '-r' ] ; then
+		maxdepth=''
+		shift 1
+	else
+		maxdepth='-maxdepth 2'
+	fi
+
+	srcdir="$1"
+
+	find "${srcdir}" -mindepth 1 ${maxdepth} -type f
+}
+
+__list_sources()
+{
+	local srcdir
+	srcdir="$1"
+
+	__list_source_dirs "${srcdir}"
+	__list_source_files "${srcdir}"
+}
+
+__replace_prefix()
+{
+	local oldpre
+	local newpre
+	local string
+
+	oldpre="$1"
+	newpre="$2"
+	string="$3"
+
+	# Replace largest prefix
+	string="${string##${oldpre}}"
+	printf "${newpre}${string}"
+}
+
+
+# ========== Script's Begin ==========
+
+. emucon-init.sh
+
+if [ $# -eq 0 ] ; then
+	__print_usage
+	emucon_exit
+fi
+
+# Parse script's command line arguments
+shortopts='scyh'
+longopts='symlink,cleanup,assume-yes,help'
+cmdargs=$(emucon_parse_cmdargs -s "${shortopts}" -l "${longopts}" -- "$@")
+if emucon_cmd_failed ; then
+	emucon_abort
+fi
+
+# Lookup parsed parameters and their arguments
+eval set -- ${cmdargs}
+while true ; do
+	case "$1" in
+		-s|--symlink)
+			symlink='y'
+			shift 1 ;;
+		-c|--cleanup)
+			cleanup='y'
+			shift 1 ;;
+		-y|--assume-yes)
+			interactive='n'
+			shift 1 ;;
+		-h|--help)
+			__print_usage
+			emucon_exit ;;
+		--)
+			shift 1
+			break ;;
+		*)
+			emucon_print_invalid_cmdargs_error "${cmdargs}"
+			emucon_abort -v ;;
+	esac
+done
+
+# Interactive mode
+if [ "${interactive:-y}" = 'y' ] ; then
+	emucon_print_info 'Running in interactive mode...'
+	iflag='-i'
+fi
+
+# Source directory
+srcdir=$(emucon_to_absolute_path "$1")
+emucon_check_required_arg '<source>' "${srcdir}"
+emucon_ensure_dir_exists "${srcdir}"
+
+# Install directory
+dstdir="${2:-${default_dstdir}}"
+emucon_ensure_dir_exists "${dstdir}"
+
+# Is install directory writable?
+if [ ! -w "${dstdir}" ] ; then
+	# No, use sudo for file operations
+	cmdprefix='sudo'
+fi
+
+# Cleanup requested?
+if [ "${cleanup}" = 'y' ] ; then
+	emucon_print_info 'Cleaning up...'
+	rmargs="-v -r ${iflag}"
+	for path in $(__list_sources "${srcdir}") ; do
+		path=$(__replace_prefix "${srcdir}" "${dstdir}" "${path}")
+		${cmdprefix} rm ${rmargs} "${path}"
+	done
+
+	emucon_exit
+fi
+
+# Prepare base directories
+emucon_print_info 'Creating target directories...'
+for dir in $(__list_base_dirs "${srcdir}") ; do
+	dir=$(__replace_prefix "${srcdir}" "${dstdir}" "${dir}")
+	${cmdprefix} mkdir -v -p "${dir}"
+done
+
+# Perform installation
+if [ "${symlink}" = 'y' ] ; then
+	emucon_print_info 'Symlinking...'
+	lnargs="-v -s ${iflag}"
+	for src in $(__list_sources "${srcdir}") ; do
+		dst=$(__replace_prefix "${srcdir}" "${dstdir}" "${src}")
+		${cmdprefix} ln ${lnargs} "${src}" "${dst}"
+	done
+else
+	emucon_print_info 'Installing...'
+	for src in $(__list_source_files -r "${srcdir}") ; do
+		dst=$(__replace_prefix "${srcdir}" "${dstdir}" "${src}")
+		${cmdprefix} install -v -C -D "${src}" "${dst}"
+	done
+fi
+
