@@ -1,0 +1,237 @@
+#!/bin/sh
+
+__cmd_name=$(basename $0)
+
+
+# ========== Helper Functions ==========
+
+__print_usage()
+{
+	cat <<- EOT
+	USAGE:
+	    ${__cmd_name} <options> -- <command> [<args>]
+
+	DESCRIPTION:
+	    Creates an OCI container configuration for the specified <command> and <args>.
+
+	OPTIONS:
+	    --output <path>
+	        Output file for the generated config (default: stdout).
+
+	    --user <name>
+	        Name of the user for UID mapping.
+
+	    --group <name>
+	        Name of the group for GID mapping.
+
+	    --env <var>
+	        Environment variable to add to runc-container.
+
+	    --mount <src:dst:options>
+	        Bind-mount src from host to dst in runc-container.
+
+	    --rootfs-readonly
+	        Make container's rootfs readonly.
+
+	ARGUMENTS:
+	    <command>
+	        Command to execute inside container.
+
+	    <args>
+	        Arguments to pass into the container's command.
+
+	EOT
+}
+
+__print_message()
+{
+	 emucon_print "$@" >&2
+}
+
+__print_masked_paths()
+{
+	cat <<- EOL
+		/proc/kcore
+		/proc/latency_stats
+		/proc/timer_list
+		/proc/timer_stats
+		/proc/sched_debug
+		/sys/firmware
+	EOL
+}
+
+__print_readonly_paths()
+{
+	cat <<- EOL
+		/proc/asound
+		/proc/bus
+		/proc/fs
+		/proc/irq
+		/proc/sys
+		/proc/sysrq-trigger
+	EOL
+}
+
+__to_cmdargs()
+{
+	local argname
+	argname="$1"
+
+	# Read stdin, prefix with argname, convert newlines to spaces
+	cat - | awk 'BEGIN { ORS="" } { print " '${argname}' " $0 }'
+}
+
+__forward()
+{
+	local output
+	output="$1"
+
+	if [ -n "${output}" ] ; then
+		# Redirect to file
+		cat - > "${output}"
+	else
+		# Redirect to stdout
+		cat -
+	fi
+}
+
+
+# ========== Script's Begin ==========
+
+. emucon-init.sh
+
+if [ $# -eq 0 ] ; then
+	__print_usage
+	emucon_exit
+fi
+
+# Check external dependencies
+emucon_ensure_is_installed 'oci-runtime-tool'
+emucon_ensure_is_installed 'jq'
+
+# Parse script's command line arguments
+shortopts='h'
+longopts='output:,user:,group:,env:,mount:,rootfs-readonly,help'
+cmdargs=$(emucon_parse_cmdargs -s "${shortopts}" -l "${longopts}" -- "$@")
+if emucon_cmd_failed ; then
+	emucon_abort
+fi
+
+# Arguments for config-generation tool
+confargs='--hostname emucon --rootfs-path rootfs'
+
+# Lookup parsed parameters and their arguments
+eval set -- ${cmdargs}
+while true ; do
+	case "$1" in
+		--output)
+			outfile="$2"
+			shift 2 ;;
+		--env)
+			confargs="${confargs} --env $2"
+			shift 2 ;;
+		--user)
+			user="$2"
+			shift 2 ;;
+		--group)
+			group="$2"
+			shift 2 ;;
+		--mount)
+			confargs="${confargs} --mount-bind $2"
+			shift 2 ;;
+		--rootfs-readonly)
+			confargs="${confargs} --rootfs-readonly"
+			shift 1 ;;
+		-h|--help)
+			__print_usage
+			emucon_exit ;;
+		--)
+			shift
+			break ;;
+		*)
+			emucon_print_invalid_cmdargs_error "${cmdargs}"
+			emucon_abort -v ;;
+	esac
+done
+
+__print_message 'Removing network-namespace...'
+confargs="${confargs} --linux-namespace-remove network"
+
+# Add user-namespace mappings
+if [ -n "${user}" ] ; then
+	__print_message 'Adding user-namespace...'
+	confargs="${confargs} --linux-namespace-add user"
+
+	__add_idmapping()
+	{
+		local mode
+		local name
+
+		mode="$1"
+		name="$2"
+
+		# Safety check
+		case "${mode}" in
+			u|g)
+				# Valid mode!
+				;;
+			*)
+				emucon_print_error "Invalid __add_idmapping mode: ${mode}"
+				emucon_abort -v ;;
+		esac
+
+		local hostid
+		local entry
+		local subid
+		local count
+
+		# Lookup subid entry
+		hostid=$(id "-${mode}" "${name}") || emucon_abort -v
+		entry=$(emucon-subid --file "/etc/sub${mode}id" "${name}") || emucon_abort
+		subid=$(echo "${entry}" | cut -f 1 -d ':')
+		count=$(echo "${entry}" | cut -f 2 -d ':')
+
+		# Add corresponding mapping parameters
+		confargs="${confargs} --linux-${mode}idmappings ${hostid}:0:1"
+		confargs="${confargs} --linux-${mode}idmappings ${subid}:1:${count}"
+	}
+
+	__print_message "Adding UID mapping for ${user}..."
+	__add_idmapping u "${user}"
+	if [ -n "${group}" ] ; then
+		__print_message "Adding GID mapping for ${group}..."
+		__add_idmapping g "${group}"
+	fi
+fi
+
+__print_message 'Adding bind-mounts...'
+confargs="${confargs} --mount-cgroups=ro --mount-bind /etc/resolv.conf:/etc/resolv.conf:bind:ro"
+
+__print_message 'Disable seccomp support...'
+confargs="${confargs} --linux-seccomp-default allow --linux-seccomp-remove-all"
+
+__print_message 'Adding masked paths...'
+confargs="${confargs}$(__print_masked_paths | __to_cmdargs --linux-masked-paths)"
+
+__print_message 'Adding readonly paths...'
+confargs="${confargs}$(__print_readonly_paths | __to_cmdargs --linux-readonly-paths)"
+
+__print_message "Adding container's command..."
+confargs="${confargs} --process-no-new-privileges"
+for arg in '/sbin/my_init' '--' "$@" ; do
+	# Add quotes around, possibly space-separated, arguments!
+	confargs="${confargs} --args '${arg}'"
+done
+
+# NOTES:
+#   - Do not mount /sys to avoid problems with user-namespaces.
+#   - Remove seccomp block from config, since it is disabled in runc.
+
+__print_message 'Running config generator...'
+# Reparse ${confargs} expansion for correct args splitting!
+eval oci-runtime-tool --host-specific generate ${confargs} \
+	| jq 'del(.mounts[] | select(.destination == "/sys"))' \
+	| jq 'del(.linux.seccomp)' \
+	| __forward "${outfile}" \
+	|| emucon_abort -v
+
