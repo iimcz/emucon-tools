@@ -188,9 +188,10 @@ if [ "${symlink}" = 'y' ] ; then
 	done
 else
 	emucon_print_info 'Installing...'
-	for src in $(__list_source_files -r "${srcdir}") ; do
+	cpargs="${iflag} -v -r --preserve"
+	for src in $(__list_sources "${srcdir}") ; do
 		dst=$(__replace_prefix "${srcdir}" "${dstdir}" "${src}")
-		${cmdprefix} install -v -C -D "${src}" "${dst}"
+		${cmdprefix} cp ${cpargs} "${src}" "${dst}"
 	done
 fi
 
