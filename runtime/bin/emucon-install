@@ -188,7 +188,7 @@ if [ "${symlink}" = 'y' ] ; then
 	done
 else
 	emucon_print_info 'Installing...'
-	cpargs="${iflag} -v -r --preserve"
+	cpargs="${iflag} -v -r --preserve=mode,timestamps"
 	for src in $(__list_sources "${srcdir}") ; do
 		dst=$(__replace_prefix "${srcdir}" "${dstdir}" "${src}")
 		${cmdprefix} cp ${cpargs} "${src}" "${dst}"
