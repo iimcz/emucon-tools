@@ -142,7 +142,7 @@ __cleanup()
 }
 
 # Setup an exit-trap
-trap __cleanup EXIT QUIT INT TERM
+trap __cleanup EXIT
 
 emucon_print_info 'Setting up overlayfs...'
 mopts="lowerdir=${ldir},upperdir=${udir},workdir=${wdir}"

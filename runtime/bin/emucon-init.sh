@@ -24,3 +24,13 @@ fi
 unset __return_code
 unset __helpers
 
+# Handler to be called on termination signals
+__on_termination() {
+	emucon_print_error 'Termination signal received!'
+	emucon_abort -v
+}
+
+# Possible cleanup callbacks should
+# be registered using the EXIT signal!
+trap __on_termination QUIT INT TERM
+

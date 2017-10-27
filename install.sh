@@ -99,7 +99,7 @@ emucon_ensure_dir_exists "${sudodir}"
 user="${user:-$(id --user --name)}"
 
 emucon_print_info 'Creating temporary directory...'
-readonly tmpdir=$(mktemp -d '/tmp/emucon-XX')
+readonly tmpdir=$(mktemp -d '/tmp/emucon-XXX')
 
 __cleanup()
 {
@@ -108,7 +108,7 @@ __cleanup()
 }
 
 # Setup an exit-trap
-trap __cleanup EXIT QUIT INT TERM
+trap __cleanup EXIT
 
 emucon_print_info 'Building OCI tools...'
 cd "${curdir}/builder"
