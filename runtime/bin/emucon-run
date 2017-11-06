@@ -27,6 +27,9 @@ __print_usage()
 	    -c, --container-id <id>
 	        ID to use for runc-container.
 
+	    --checkpoint <archive>
+	        Path to the checkpoint-archive.
+
 	    --cleanup
 	        Cleanup and remove working-dir when done.
 
@@ -52,7 +55,7 @@ emucon_ensure_is_installed 'runc'
 
 # Parse script's command line arguments
 shortopts='w:l:u:c:e:h'
-longopts='working-dir:,lower-dir:,upper-dir:,container-id:,cleanup,non-interactive,help'
+longopts='working-dir:,lower-dir:,upper-dir:,container-id:,checkpoint:,cleanup,non-interactive,help'
 cmdargs=$(emucon_parse_cmdargs -s "${shortopts}" -l "${longopts}" -- "$@")
 if emucon_cmd_failed ; then
 	emucon_abort
@@ -73,6 +76,9 @@ while true ; do
 			shift 2 ;;
 		-c|--container-id)
 			cid="$2"
+			shift 2 ;;
+		--checkpoint)
+			checkpoint="$2"
 			shift 2 ;;
 		--cleanup)
 			cleanup='y'
@@ -144,11 +150,33 @@ __cleanup()
 # Setup an exit-trap
 trap __cleanup EXIT
 
+readonly user=$(id --user --name)
+
 emucon_print_info 'Setting up overlayfs...'
 mopts="lowerdir=${ldir},upperdir=${udir},workdir=${wdir}"
 sudo ${sopts} -- mount -t overlay overlay -o ${mopts} "${mdir}" || emucon_abort -v
 
-emucon_print_info "Starting container ${cid}..."
-sudo ${sopts} -- runc --debug run "${cid}" || emucon_abort -v
+# Start a new container or restore from checkpoint?
+if [ -z "${checkpoint}" ] ; then
+	emucon_print_info "Starting container ${cid}..."
+	sudo ${sopts} -- runc --debug run "${cid}" || emucon_abort -v
+else
+	# Extract checkpoint data from archive
+	emucon_ensure_file_exists "${checkpoint}"
+	emucon_print_info "Extracting checkpoint from ${checkpoint}..."
+	tar --extract --totals --file "${checkpoint}" || emucon_abort -v
+
+	sdir="${workdir}/state"
+
+	emucon_print_info "Restoring container ${cid}..."
+	runcopts="--file-locks --ext-unix-sk --image-path ${sdir} --work-path ${sdir}"
+	if ! sudo ${sopts} -- runc --debug restore ${runcopts} "${cid}" ; then
+		# Restore failed, print CRIU's log
+		sudo ${sopts} chown --recursive "${user}:${user}" "${sdir}"
+		cat "${sdir}/restore.log"
+		emucon_abort -v
+	fi
+fi
+
 emucon_print_info "Container ${cid} stopped."
 
