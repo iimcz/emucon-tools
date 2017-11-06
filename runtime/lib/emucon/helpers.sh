@@ -137,6 +137,14 @@ emucon_ensure_dir_exists()
 	fi
 }
 
+emucon_ensure_file_exists()
+{
+	if [ ! -f "$1" ] ; then
+		emucon_print_error "Specified file does not exist: $1"
+		emucon_abort -v
+	fi
+}
+
 emucon_ensure_is_installed()
 {
 	local cmd

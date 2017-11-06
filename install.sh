@@ -129,6 +129,7 @@ sudosrc="$(emucon-paths sudoers.template)"
 sudotmp="${tmpdir}/emucon-pwdless-commands"
 sedcmds="s|{{install-dir}}|${dstdir}|g; s|{{user}}|${user}|g"
 cat "${sudosrc}" | sed "${sedcmds}" > "${sudotmp}" || emucon_abort
+visudo --check --file "${sudotmp}" || emucon_abort
 if [ ! -w "${sudodir}" ] ; then
 	# Install directory not writable,
 	# use sudo for file operations

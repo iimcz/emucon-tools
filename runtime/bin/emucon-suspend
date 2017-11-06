@@ -1,0 +1,84 @@
+#!/bin/sh
+
+__cmd_name=$(basename $0)
+
+
+# ========== Helper Functions ==========
+
+__print_usage()
+{
+	cat <<- EOT
+	USAGE:
+	    ${__cmd_name} [options] <container-id>
+
+	DESCRIPTION:
+	    Suspends a running runc-container.
+
+	ARGUMENTS:
+	    <container-id>
+	        ID of the container to suspend.
+
+	OPTIONS:
+	    --non-interactive
+	        Avoid prompting the user for password when executing privileged commands.
+	        For this to work, sudo must be configured accordingly (see README).
+
+	EOT
+}
+
+
+# ========== Script's Begin ==========
+
+. emucon-init.sh
+
+if [ $# -eq 0 ]; then
+	__print_usage
+	emucon_exit
+fi
+
+# Check external dependencies
+emucon_ensure_is_installed 'runc'
+
+# Parse script's command line arguments
+cmdargs=$(emucon_parse_cmdargs -s 'h' -l 'non-interactive,help' -- "$@")
+if emucon_cmd_failed ; then
+	emucon_abort
+fi
+
+# Lookup parsed parameters and their arguments
+eval set -- ${cmdargs}
+while true ; do
+	case "$1" in
+		--non-interactive)
+			interactive='n'
+			shift 1 ;;
+		-h|--help)
+			__print_usage
+			emucon_exit ;;
+		--)
+			shift
+			break ;;
+		*)
+			emucon_print_invalid_cmdargs_error "${cmdargs}"
+			emucon_abort -v ;;
+	esac
+done
+
+# Container's ID
+cid="$1"
+
+# Check required parameters
+emucon_check_required_arg '<container-id>' "${cid}"
+
+# Interactive mode
+if [ "${interactive:=y}" = 'y' ] ; then
+	emucon_print_info 'Running in interactive mode...'
+else
+	emucon_print_info 'Running in non-interactive mode...'
+	sopts='--non-interactive'
+fi
+
+emucon_print_info "Suspending container ${cid}..."
+sudo ${sopts} -- runc --debug pause "${cid}" || emucon_abort -v
+emucon_print_info "Container ${cid} suspended."
+

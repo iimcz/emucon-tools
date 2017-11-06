@@ -14,10 +14,25 @@ Cmnd_Alias RM_COMMANDS = /bin/rm -[rv] -[rv] /tmp/eaas-*, \
                          /bin/rm /tmp/eaas-*
 
 
+# Allowed chown command calls
+Cmnd_Alias CHOWN_COMMANDS = /bin/chown --recursive {{user}}\:{{user}} /tmp/eaas-*/state, \
+                            /bin/chown -R {{user}}\:{{user}} /tmp/eaas-*/state, \
+                            /bin/chown --recursive {{user}}\:{{user}} state, \
+                            /bin/chown -R {{user}}\:{{user}} state
+
+
 # Allowed runc command calls
 Cmnd_Alias RUNC_COMMANDS = {{install-dir}}/bin/runc --* run *, \
-                           {{install-dir}}/bin/runc run *
+                           {{install-dir}}/bin/runc run *, \
+                           {{install-dir}}/bin/runc --* pause *, \
+                           {{install-dir}}/bin/runc pause *, \
+                           {{install-dir}}/bin/runc --* resume *, \
+                           {{install-dir}}/bin/runc resume *, \
+                           {{install-dir}}/bin/runc --* checkpoint *, \
+                           {{install-dir}}/bin/runc checkpoint *, \
+                           {{install-dir}}/bin/runc --* restore *, \
+                           {{install-dir}}/bin/runc restore *
 
 
-{{user}}  ALL = NOPASSWD: MOUNT_COMMANDS, RUNC_COMMANDS, RM_COMMANDS
+{{user}}  ALL = NOPASSWD: MOUNT_COMMANDS, RUNC_COMMANDS, RM_COMMANDS, CHOWN_COMMANDS
 
