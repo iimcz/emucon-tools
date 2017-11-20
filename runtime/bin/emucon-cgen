@@ -30,6 +30,12 @@ __print_usage()
 	    --mount <src:dst:options>
 	        Bind-mount src from host to dst in runc-container.
 
+	    --mask <path>
+	        Mask provided path as unreadable inside runc-container.
+
+	    --rootfs <path>
+	        Path to the rootfs tree.
+
 	    --rootfs-readonly
 	        Make container's rootfs readonly.
 
@@ -111,14 +117,15 @@ emucon_ensure_is_installed 'jq'
 
 # Parse script's command line arguments
 shortopts='h'
-longopts='output:,user:,group:,env:,mount:,rootfs-readonly,help'
+longopts='output:,user:,group:,env:,mount:,mask:,rootfs:,rootfs-readonly,help'
 cmdargs=$(emucon_parse_cmdargs -s "${shortopts}" -l "${longopts}" -- "$@")
 if emucon_cmd_failed ; then
 	emucon_abort
 fi
 
 # Arguments for config-generation tool
-confargs='--hostname emucon --rootfs-path rootfs'
+confargs='--hostname emucon'
+rootfs="rootfs"
 
 # Lookup parsed parameters and their arguments
 eval set -- ${cmdargs}
@@ -139,6 +146,12 @@ while true ; do
 		--mount)
 			confargs="${confargs} --mount-bind $2"
 			shift 2 ;;
+		--mask)
+			confargs="${confargs} --linux-masked-paths $2"
+			shift 2 ;;
+		--rootfs)
+			rootfs="$2"
+			shift 2 ;;
 		--rootfs-readonly)
 			confargs="${confargs} --rootfs-readonly"
 			shift 1 ;;
@@ -153,6 +166,8 @@ while true ; do
 			emucon_abort -v ;;
 	esac
 done
+
+confargs="${confargs} --rootfs-path ${rootfs}"
 
 __print_message 'Removing network-namespace...'
 confargs="${confargs} --linux-namespace-remove network"
