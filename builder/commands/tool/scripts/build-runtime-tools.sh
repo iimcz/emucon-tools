@@ -3,8 +3,12 @@
 #
 
 __print_message 'Downloading OCI runtime-tools...'
-go get -d github.com/opencontainers/runtime-tools/cmd/oci-runtime-tool
-cd "${GOPATH}/src/github.com/opencontainers/runtime-tools"
+dstdir="${GOPATH}/src/github.com/opencontainers/runtime-tools"
+url='https://github.com/opencontainers/runtime-tools.git'
+tag='v0.4.0'
+mkdir -v -p "${dstdir}"
+cd "${dstdir}"
+git clone --depth 1 --branch "${tag}" "${url}" .
 
 __print_message 'Building OCI runtime-tools...'
 make

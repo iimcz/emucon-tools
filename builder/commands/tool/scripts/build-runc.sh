@@ -3,8 +3,12 @@
 #
 
 __print_message 'Downloading OCI runc...'
-go get -d github.com/opencontainers/runc
-cd "${GOPATH}/src/github.com/opencontainers/runc"
+dstdir="${GOPATH}/src/github.com/opencontainers/runc"
+url='https://github.com/opencontainers/runc.git'
+tag='v1.0.0-rc4'
+mkdir -v -p "${dstdir}"
+cd "${dstdir}"
+git clone --depth 1 --branch "${tag}" "${url}" .
 
 __print_message 'Building OCI runc...'
 make BUILDTAGS=''
