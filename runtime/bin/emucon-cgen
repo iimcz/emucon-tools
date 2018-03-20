@@ -18,10 +18,16 @@ __print_usage()
 	    --output <path>
 	        Output file for the generated config (default: stdout).
 
-	    --user <name>
+	    --user-id <id>
+	        ID of the user in container-space for the process.
+
+	    --group-id <id>
+	        ID of the group in container-space for the process.
+
+	    --user-mapping <name>
 	        Name of the user for UID mapping.
 
-	    --group <name>
+	    --group-mapping <name>
 	        Name of the group for GID mapping.
 
 	    --env <var>
@@ -149,7 +155,7 @@ emucon_ensure_is_installed 'jq'
 
 # Parse script's command line arguments
 shortopts='h'
-longopts='output:,user:,group:,env:,mount:,mask:,rootfs:,rootfs-readonly,help'
+longopts='output:,user-id:,group-id:,user-mapping:,group-mapping:,env:,mount:,mask:,rootfs:,rootfs-readonly,help'
 cmdargs=$(emucon_parse_cmdargs -s "${shortopts}" -l "${longopts}" -- "$@")
 if emucon_cmd_failed ; then
 	emucon_abort
@@ -169,11 +175,17 @@ while true ; do
 		--env)
 			confargs="${confargs} --env $2"
 			shift 2 ;;
-		--user)
-			user="$2"
+		--user-id)
+			userid="$2"
 			shift 2 ;;
-		--group)
-			group="$2"
+		--group-id)
+			groupid="$2"
+			shift 2 ;;
+		--user-mapping)
+			usermap="$2"
+			shift 2 ;;
+		--group-mapping)
+			groupmap="$2"
 			shift 2 ;;
 		--mount)
 			confargs="${confargs} $(__to_mountarg 'bind' $2)"
@@ -204,8 +216,17 @@ confargs="${confargs} --rootfs-path ${rootfs}"
 __print_message 'Removing network-namespace...'
 confargs="${confargs} --linux-namespace-remove network"
 
+# Add user/group for the main-process
+if [ -n "${userid}" ] ; then
+	__print_message 'Adding UID/GID for the main-process...'
+	confargs="${confargs} --process-uid ${userid}"
+	if [ -n "${groupid}" ] ; then
+		confargs="${confargs} --process-gid ${groupid}"
+	fi
+fi
+
 # Add user-namespace mappings
-if [ -n "${user}" ] ; then
+if [ -n "${usermap}" ] ; then
 	__print_message 'Adding user-namespace...'
 	confargs="${confargs} --linux-namespace-add user"
 
@@ -243,11 +264,11 @@ if [ -n "${user}" ] ; then
 		confargs="${confargs} --linux-${mode}idmappings ${subid}:1:${count}"
 	}
 
-	__print_message "Adding UID mapping for ${user}..."
-	__add_idmapping u "${user}"
-	if [ -n "${group}" ] ; then
-		__print_message "Adding GID mapping for ${group}..."
-		__add_idmapping g "${group}"
+	__print_message "Adding UID mapping for ${usermap}..."
+	__add_idmapping u "${usermap}"
+	if [ -n "${groupmap}" ] ; then
+		__print_message "Adding GID mapping for ${groupmap}..."
+		__add_idmapping g "${groupmap}"
 	fi
 fi
 
