@@ -15,8 +15,8 @@ Cmnd_Alias RM_COMMANDS = /bin/rm -[rv] -[rv] /tmp/eaas-*, \
 
 
 # Allowed chown command calls
-Cmnd_Alias CHOWN_COMMANDS = /bin/chown --recursive {{user}}\:{{user}} /tmp/eaas-*/state, \
-                            /bin/chown -R {{user}}\:{{user}} /tmp/eaas-*/state, \
+Cmnd_Alias CHOWN_COMMANDS = /bin/chown --recursive {{user}}\:{{user}} /tmp/eaas-*, \
+                            /bin/chown -R {{user}}\:{{user}} /tmp/eaas-*, \
                             /bin/chown --recursive {{user}}\:{{user}} state, \
                             /bin/chown -R {{user}}\:{{user}} state
 

@@ -141,6 +141,10 @@ __cleanup()
 		# Remove only created files/dirs
 		sudo ${sopts} -- rm -v -r "${mdir}"
 		sudo ${sopts} -- rm -v -r "${wdir}"
+
+		# Update owner of files in the COW-layer,
+		# since some of them may be created by root 
+		sudo ${sopts} chown --recursive "${user}:${user}" "${udir}"
 	fi
 
 	# Return the process' exit-code
