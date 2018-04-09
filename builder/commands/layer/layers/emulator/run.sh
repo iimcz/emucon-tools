@@ -131,7 +131,7 @@ for emulator in ${emulators} ; do
 	emucon_print_info "Using working directory: ${workdir}"
 
 	emucon_print_info "Generating config.json for ${emulator}..."
-	emucon-cgen --user-mapping "${user}" --group-mapping "${group}" --mount "${scripts}:/emucon-scripts:bind:ro" \
+	emucon-cgen --mount "${scripts}:/emucon-scripts:bind:ro" \
 		-- '/emucon-scripts/install.sh' "${emulator}" \
 		> "${workdir}/config.json"
 
