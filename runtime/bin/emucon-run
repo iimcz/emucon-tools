@@ -144,7 +144,7 @@ __cleanup()
 
 		# Update owner of files in the COW-layer,
 		# since some of them may be created by root 
-		sudo ${sopts} chown --recursive "${user}:${user}" "${udir}"
+		sudo ${sopts} chown --recursive "${user}:${group}" "${udir}"
 	fi
 
 	# Return the process' exit-code
@@ -155,6 +155,7 @@ __cleanup()
 trap __cleanup EXIT
 
 readonly user=$(id --user --name)
+readonly group=$(id --group --name)
 
 emucon_print_info 'Setting up overlayfs...'
 mopts="lowerdir=${ldir},upperdir=${udir},workdir=${wdir}"
@@ -176,7 +177,7 @@ else
 	runcopts="--file-locks --ext-unix-sk --image-path ${sdir} --work-path ${sdir}"
 	if ! sudo ${sopts} -- runc --debug restore ${runcopts} "${cid}" ; then
 		# Restore failed, print CRIU's log
-		sudo ${sopts} chown --recursive "${user}:${user}" "${sdir}"
+		sudo ${sopts} chown --recursive "${user}:${group}" "${sdir}"
 		cat "${sdir}/restore.log"
 		emucon_abort -v
 	fi
