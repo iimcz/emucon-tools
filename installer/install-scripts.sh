@@ -83,8 +83,9 @@ if [ $# -ne 0 ] ; then
 	emucon_abort -v
 fi
 
-# Installer scripts directory
-srcdir=$(emucon_get_current_dir "$0")/installer
+# Runtime directory
+curdir=$(emucon_get_current_dir "$0")
+srcdir=$(readlink -f "${curdir}/../runtime")
 
 # Install directory
 dstdir="${dstdir:-${default_dstdir}}"
@@ -97,7 +98,32 @@ emucon_ensure_dir_exists "${sudodir}"
 # Sudoers user
 user="${user:-$(id --user --name)}"
 
-${srcdir}/install-oci-tools.sh --destination "${dstdir}" || emucon_abort
-${srcdir}/install-scripts.sh --user "${user}" --sudoers-dir "${sudodir}" --destination "${dstdir}" || emucon_abort
-${srcdir}/install-deps.sh || emucon_abort
+emucon_print_info 'Creating temporary directory...'
+readonly tmpdir=$(mktemp -d '/tmp/emucon-XXX')
+
+__cleanup()
+{
+	emucon_print_info 'Cleaning up...'
+	sudo rm -r -v "${tmpdir}"
+}
+
+# Setup an exit-trap
+trap __cleanup EXIT
+
+emucon_print_info 'Installing emucon-tools...'
+emucon-install "${srcdir}" "${dstdir}" || emucon_abort
+
+emucon_print_info "Installing sudoers configuration for user '${user}'..."
+sudosrc="$(emucon-paths sudoers.template)"
+sudotmp="${tmpdir}/emucon-pwdless-commands"
+sedcmds="s|{{install-dir}}|${dstdir}|g; s|{{user}}|${user}|g"
+cat "${sudosrc}" | sed "${sedcmds}" > "${sudotmp}" || emucon_abort
+visudo --check --file "${sudotmp}" || emucon_abort
+if [ ! -w "${sudodir}" ] ; then
+	# Install directory not writable,
+	# use sudo for file operations
+	cmdprefix='sudo'
+fi
+
+${cmdprefix} install -v -m 440 "${sudotmp}" "${sudodir}" || emucon_abort
 

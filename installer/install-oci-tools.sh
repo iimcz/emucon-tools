@@ -5,9 +5,6 @@ __cmd_name=$(basename "$0")
 # Default install directory
 readonly default_dstdir='/usr/local'
 
-# Default sudoers directory
-readonly default_sudodir='/etc/sudoers.d'
-
 
 # ========== Helper Functions ==========
 
@@ -15,20 +12,14 @@ __print_usage()
 {
 	cat <<- EOT
 	USAGE:
-	    ${__cmd_name} [-u <name>] [--sudoers-dir <path>] [--destination <path>]
+	    ${__cmd_name} [--destination <path>]
 
 	DESCRIPTION:
-	    Installs emucon-tools and dependencies on the host system.
+	    Builds and installs OCI-Tools.
 
 	OPTIONS:
 	    -d, --destination <path>
 	        The path to install into. (default: ${default_dstdir})
-
-	    -u, --user <name>
-	        The name of the user for sudoers configuration.
-
-	    --sudoers-dir <path>
-	        The path for sudoers drop-in files. (default: ${default_sudodir})
 
 	EOT
 }
@@ -46,8 +37,8 @@ fi
 . emucon-init.sh
 
 # Parse script's command line arguments
-longopts='destination:,user:,sudoers-dir:,help'
-cmdargs=$(emucon_parse_cmdargs -s 'd:u:h' -l "${longopts}" -- "$@")
+longopts='destination:,help'
+cmdargs=$(emucon_parse_cmdargs -s 'd:h' -l "${longopts}" -- "$@")
 if emucon_cmd_failed ; then
 	emucon_abort
 fi
@@ -58,12 +49,6 @@ while true ; do
 	case "$1" in
 		-d|--destination)
 			dstdir="$2"
-			shift 2 ;;
-		-u|--user)
-			user="$2"
-			shift 2 ;;
-		--sudoers-dir)
-			sudodir="$2"
 			shift 2 ;;
 		-h|--help)
 			__print_usage
@@ -83,21 +68,29 @@ if [ $# -ne 0 ] ; then
 	emucon_abort -v
 fi
 
-# Installer scripts directory
-srcdir=$(emucon_get_current_dir "$0")/installer
+# Runtime directory
+curdir=$(emucon_get_current_dir "$0")
 
 # Install directory
 dstdir="${dstdir:-${default_dstdir}}"
 emucon_ensure_dir_exists "${dstdir}"
 
-# Sudoers directory
-sudodir="${sudodir:-${default_sudodir}}"
-emucon_ensure_dir_exists "${sudodir}"
+emucon_print_info 'Creating temporary directory...'
+readonly tmpdir=$(mktemp -d '/tmp/emucon-XXX')
 
-# Sudoers user
-user="${user:-$(id --user --name)}"
+__cleanup()
+{
+	emucon_print_info 'Cleaning up...'
+	sudo rm -r -v "${tmpdir}"
+}
 
-${srcdir}/install-oci-tools.sh --destination "${dstdir}" || emucon_abort
-${srcdir}/install-scripts.sh --user "${user}" --sudoers-dir "${sudodir}" --destination "${dstdir}" || emucon_abort
-${srcdir}/install-deps.sh || emucon_abort
+# Setup an exit-trap
+trap __cleanup EXIT
+
+emucon_print_info 'Building OCI tools...'
+cd "${curdir}/../builder"
+./emucon-build tool --output-dir "${tmpdir}" || emucon_abort
+
+emucon_print_info 'Installing OCI tools...'
+emucon-install "${tmpdir}" "${dstdir}" || emucon_abort
 

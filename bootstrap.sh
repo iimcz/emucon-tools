@@ -2,7 +2,7 @@
 # Bootstrapping for emucon-tools
 #
 
-curdir="$(dirname $(readlink -f $0))"
+curdir="$(pwd)"
 bindir="${curdir}/runtime/bin"
 
 if [ ! -f "${bindir}/emucon-init.sh" ] ; then
