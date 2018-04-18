@@ -138,16 +138,18 @@ __cleanup()
 trap __cleanup EXIT
 
 readonly user=$(id --user --name)
+readonly group=$(id --group --name)
 
 emucon_print_info "Dumping container ${cid}..."
 runcopts="${runcargs} --image-path ${imgdir} --work-path ${workdir}"
 if ! sudo ${sopts} -- runc --debug checkpoint ${runcopts} "${cid}" ; then
+	sudo ${sopts} -- chown --recursive "${user}:${group}" "${imgdir}"
 	cat "${imgdir}/dump.log"
 	emucon_abort -v
 fi
 
 emucon_print_info "Post-processing dump-images..."
-sudo ${sopts} -- chown --recursive "${user}:${user}" "${imgdir}" || emucon_abort -v
+sudo ${sopts} -- chown --recursive "${user}:${group}" "${imgdir}" || emucon_abort -v
 
 emucon_print_info "Creating checkpoint archive..."
 taropts="--create --auto-compress --totals --file ${output}"
