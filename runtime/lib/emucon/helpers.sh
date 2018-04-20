@@ -116,17 +116,25 @@ emucon_check_required_arg()
 
 emucon_to_absolute_path()
 {
-	echo $(readlink -f $1)
+	if [ -f "$1" ] ; then
+		local dname="$(dirname "$1")"
+		local fname="/$(basename "$1")"
+	else
+		local dname="$1"
+	fi
+
+	dname="$(cd "${dname}" && pwd)"
+	printf '%s%s\n' "${dname}" "${fname}"
 }
 
-emucon_to_absolute_dir()
+emucon_to_absolute_dirname()
 {
-	echo $(dirname $(readlink -f $1))
+	echo $(dirname $(emucon_to_absolute_path "$1"))
 }
 
 emucon_get_current_dir()
 {
-	echo $(emucon_to_absolute_dir $0)
+	echo $(emucon_to_absolute_dirname "$0")
 }
 
 emucon_ensure_dir_exists()

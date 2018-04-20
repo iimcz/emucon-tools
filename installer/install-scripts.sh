@@ -84,8 +84,8 @@ if [ $# -ne 0 ] ; then
 fi
 
 # Runtime directory
-curdir=$(emucon_get_current_dir "$0")
-srcdir=$(readlink -f "${curdir}/../runtime")
+curdir=$(emucon_get_current_dir)
+srcdir=$(emucon_to_absolute_path "${curdir}/../runtime")
 
 # Install directory
 dstdir="${dstdir:-${default_dstdir}}"
