@@ -45,6 +45,9 @@ __print_usage()
 	    --rootfs-readonly
 	        Make container's rootfs readonly.
 
+		--enable-kvm
+		    Enable KVM device inside container.
+
 	ARGUMENTS:
 	    <command>
 	        Command to execute inside container.
@@ -124,7 +127,6 @@ __to_mountarg()
 	echo -n "]}'"
 }
 
-
 __forward()
 {
 	local output
@@ -137,6 +139,15 @@ __forward()
 		# Redirect to stdout
 		cat -
 	fi
+}
+
+__enable_kvm()
+{
+	# Mount KVM device
+	echo -n "$(__to_mountarg 'bind' '/dev/kvm:/dev/kvm:bind:rw') "
+
+	# Enable KVM device
+	echo -n "--linux-device-add 'c:10:232:/dev/kvm:fileMode=777'"
 }
 
 
@@ -155,7 +166,7 @@ emucon_ensure_is_installed 'jq'
 
 # Parse script's command line arguments
 shortopts='h'
-longopts='output:,user-id:,group-id:,user-mapping:,group-mapping:,env:,mount:,mask:,rootfs:,rootfs-readonly,help'
+longopts='output:,user-id:,group-id:,user-mapping:,group-mapping:,env:,mount:,mask:,rootfs:,rootfs-readonly,enable-kvm,help'
 cmdargs=$(emucon_parse_cmdargs -s "${shortopts}" -l "${longopts}" -- "$@")
 if emucon_cmd_failed ; then
 	emucon_abort
@@ -198,6 +209,9 @@ while true ; do
 			shift 2 ;;
 		--rootfs-readonly)
 			confargs="${confargs} --rootfs-readonly"
+			shift 1 ;;
+		--enable-kvm)
+			confargs="${confargs} $(__enable_kvm)"
 			shift 1 ;;
 		-h|--help)
 			__print_usage
