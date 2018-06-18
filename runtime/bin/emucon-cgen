@@ -143,11 +143,10 @@ __forward()
 
 __enable_kvm()
 {
-	# Mount KVM device
-	echo -n "$(__to_mountarg 'bind' '/dev/kvm:/dev/kvm:bind:rw') "
 
 	# Enable KVM device
-	echo -n "--linux-device-add 'c:10:232:/dev/kvm:fileMode=777'"
+	echo -n "--linux-device-add 'c:10:232:/dev/kvm:fileMode=777' "
+	echo -n "--linux-device-cgroup-add 'allow,type=c,major=10,minor=232,access=rwm'"
 }
 
 
