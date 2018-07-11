@@ -76,7 +76,7 @@ if emucon_cmd_failed ; then
 fi
 
 emucon_print_info "Exporting image to ${outdir}"
-excludes='--exclude=dev/* --exclude=proc/* --exclude=usr/share/doc/* --exclude=usr/share/man/* --exclude=*/__pycache__/* --exclude=emucon-*'
+excludes='--exclude=dev/* --exclude=proc/* --exclude=usr/share/doc/* --exclude=usr/share/man/* --exclude=*/__pycache__/*'
 tarargs="--ignore-failed-read --totals -C ${outdir}"
 sudo docker export "${container}" | tar ${excludes} ${tarargs} -xvf -
 

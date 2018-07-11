@@ -47,6 +47,10 @@ apt-get autoremove
 __print_message 'Removing emulators...'
 apt-get remove -y --allow-unauthenticated ${emulators}
 
+__print_message 'Installing emucon-init...'
+install -v -m 'a=rx' "${scripts}/emucon-init" '/usr/bin/emucon-init'
+install -v -m 'a=rx' "${scripts}/emucon-starter" '/usr/bin/emucon-starter'
+
 # NOTE: apt-get tool tries to drop privileges, when run as root.
 #       For this a user _apt is created inside of the container.
 #       But when we export and run containers inside a user-namespace,

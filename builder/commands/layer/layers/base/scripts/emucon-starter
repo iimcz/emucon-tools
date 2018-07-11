@@ -1,0 +1,74 @@
+#!/bin/sh
+
+#
+# This script waits for all VDE-switches to start, then
+# executes the main command as specified by the caller.
+#
+
+# ========== Helper Functions ==========
+
+__abort() {
+	echo 'Aborting...'
+	exit 1
+}
+
+__list_nics() {
+	ls "$1" | grep 'nic'
+}
+
+
+# ========== Script's Begin ==========
+
+# Parse command line arguments
+cmdargs=$(getopt -o 'n:' -l 'networks-dir:' -n 'emucon-starter' -- "$@")
+if [ $? -ne 0 ] ; then
+	echo 'Parsing command arguments failed!'
+	__abort
+fi
+
+# Lookup parsed parameters and their arguments
+eval set -- ${cmdargs}
+while [ $# -gt 0 ] ; do
+	case "$1" in
+		-n|--networks-dir)
+			nicsdir="$2"
+			shift 1 ;;
+		--)
+			shift 1
+			break ;;
+		*)
+			echo "Invalid command line arguments found: ${cmdargs}"
+			__abort ;;
+	esac
+	shift 1
+done
+
+# NOTE: Remaining arguments will be interpreted as the main command!
+
+if [ -z "${nicsdir}" ] || [ ! -d "${nicsdir}" ] ; then
+	echo "Required argument -n/--networks-dir is missing!"
+	__abort
+fi
+
+readonly maxiter='5'
+readonly delay='1s'
+
+echo 'Waiting for all vde-hubs to start...'
+for nic in $(__list_nics "${nicsdir}") ; do
+	curiter='-1'
+	service="/etc/service/${nic}"
+	socket="${nicsdir}/${nic}/ctl"
+	while [ ! -e "${socket}" ] ; do
+		curiter=$((curiter + 1))
+		if [ "${curiter}" -gt "${maxiter}" ] ; then
+			echo "==> FAILED:  ${service}"
+			__abort
+		fi
+		sleep "${delay}"
+	done
+    echo "==> STARTED: ${service}"
+done
+
+echo 'Running main command...'
+exec "$@"
+

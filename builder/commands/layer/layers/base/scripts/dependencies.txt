@@ -7,4 +7,5 @@
 libguac-client-sdlonp0
 libsdl1.2debian
 qemu-utils
+vde2
 

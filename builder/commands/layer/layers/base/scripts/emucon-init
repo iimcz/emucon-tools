@@ -1,0 +1,82 @@
+#!/bin/sh
+
+#
+# Script that starts VDE-switches and emulator,
+# using container's internal init-system.
+#
+
+# ========== Helper Functions ==========
+
+__abort() {
+	echo 'Aborting...'
+	exit 1
+}
+
+__list_nics() {
+	ls "$1" | grep 'nic'
+}
+
+__generate_vdehub_unit() {
+	local sockdir="$1"
+	cat <<- EOF
+		#!/bin/sh
+		exec vde_switch -hub -s "${sockdir}"
+	EOF
+}
+
+
+# ========== Script's Begin ==========
+
+# Parse command line arguments
+cmdargs=$(getopt -o 'n:' -l 'networks-dir:' -n 'emucon-init' -- "$@")
+if [ $? -ne 0 ] ; then
+	echo 'Parsing command arguments failed!'
+	__abort
+fi
+
+# Lookup parsed parameters and their arguments
+eval set -- ${cmdargs}
+while [ $# -gt 0 ] ; do
+	case "$1" in
+		-n|--networks-dir)
+			nicsdir="$2"
+			shift 1 ;;
+		--)
+			shift 1
+			break ;;
+		*)
+			echo "Invalid command line arguments found: ${cmdargs}"
+			__abort ;;
+	esac
+	shift 1
+done
+
+# NOTE: Remaining arguments will be passed to the actual init-system!
+
+if [ -z "${nicsdir}" ] || [ ! -d "${nicsdir}" ] ; then
+	echo "Required argument -n/--networks-dir is missing!"
+	__abort
+fi
+
+# NOTE: We need to start a vde-hub for every NIC.
+#       Since container's init-system is based on runit,
+#       corresponding runit-entries will be used for this.
+#
+# SEE:  https://github.com/phusion/baseimage-docker#running-scripts-during-container-startup
+
+echo 'Generating vde-hub units...'
+for nic in $(__list_nics "${nicsdir}") ; do
+	nicpath="${nicsdir}/${nic}"
+	nicunit="/etc/service/${nic}"
+	runner="${nicunit}/run"
+	mkdir -p "${nicunit}"
+	__generate_vdehub_unit "${nicpath}" > "${runner}"
+	chmod a=rx "${runner}"
+	echo "==> DONE: ${nicunit}"
+done
+
+# Hand over to the actual init-system, as described in:
+# https://github.com/phusion/baseimage-docker#running-a-one-shot-command-in-a-new-container
+echo "Switching to container's init-system..."
+exec /sbin/my_init -- /usr/bin/emucon-starter --networks-dir "${nicsdir}" -- "$@"
+
