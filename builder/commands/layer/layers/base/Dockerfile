@@ -6,5 +6,5 @@ COPY scripts /emucon-scripts/
 COPY data/bwfla.list /etc/apt/sources.list.d/bwfla.list
 COPY data/pin-bwfla.pref /etc/apt/preferences.d/pin-bwfla.pref
 
-RUN /emucon-scripts/install.sh
+RUN /sbin/my_init -- /emucon-scripts/install.sh
 

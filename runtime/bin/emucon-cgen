@@ -45,8 +45,8 @@ __print_usage()
 	    --rootfs-readonly
 	        Make container's rootfs readonly.
 
-		--enable-kvm
-		    Enable KVM device inside container.
+	    --enable-kvm
+	        Enable KVM device inside container.
 
 	ARGUMENTS:
 	    <command>

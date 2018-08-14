@@ -9,7 +9,7 @@ __print_usage()
 {
 	cat <<- EOT
 	USAGE:
-	    ${__cmd_name} -w <path> -l <path> -u <path> -c <id>
+	    ${__cmd_name} -w <path> -t <type> ([-d <dir>] | [-i <image>] | [-l <path> -u <path>]) -c <id>
 
 	DESCRIPTION:
 	    Creates and runs a runc-container.
@@ -18,11 +18,23 @@ __print_usage()
 	    -w, --working-dir <path>
 	        Container's working directory.
 
-	    -l, --lower-dir <path>[:<path>...]
-	        Lower directory for the overlayfs.
+	    -t, --rootfs-type <type>
+	        Type of rootfs: tree, qcow, overlay
 
-	    -u, --upper-dir <path>
-	        Upper directory for the overlayfs.
+	    -d, --rootfs-dir <path>
+	        Path to directory containing rootfs.
+
+	    -i, --rootfs-image <path>
+	        Path to qcow-image containing rootfs.
+
+	    -l, --rootfs-lower-dir <path>[:<path>...]
+	        Lower directory for overlayfs.
+
+	    -u, --rootfs-upper-dir <path>
+	        Upper directory for overlayfs.
+
+	    -n, --use-nbd <dev>
+	        Connect qcow-image to specified NBD device.
 
 	    -c, --container-id <id>
 	        ID to use for runc-container.
@@ -54,12 +66,9 @@ fi
 emucon_ensure_is_installed 'runc'
 
 # Parse script's command line arguments
-shortopts='w:l:u:c:e:h'
-longopts='working-dir:,lower-dir:,upper-dir:,container-id:,checkpoint:,cleanup,non-interactive,help'
-cmdargs=$(emucon_parse_cmdargs -s "${shortopts}" -l "${longopts}" -- "$@")
-if emucon_cmd_failed ; then
-	emucon_abort
-fi
+shortopts='w:t:d:i:l:u:n:c:h'
+longopts='working-dir:,rootfs-type:,rootfs-dir:,rootfs-image:,rootfs-lower-dir:,rootfs-upper-dir:,use-nbd:,container-id:,checkpoint:,cleanup,non-interactive,help'
+cmdargs=$(emucon_parse_cmdargs -s "${shortopts}" -l "${longopts}" -- "$@") || emucon_abort
 
 # Lookup parsed parameters and their arguments
 eval set -- ${cmdargs}
@@ -68,11 +77,23 @@ while true ; do
 		-w|--working-dir)
 			workdir="$2"
 			shift 2 ;;
-		-l|--lower-dir)
+		-t|--rootfs-type)
+			fstype="$2"
+			shift 2 ;;
+		-d|--rootfs-dir)
+			fsdir="$2"
+			shift 2 ;;
+		-i|--rootfs-image)
+			fsimage="$2"
+			shift 2 ;;
+		-l|--rootfs-lower-dir)
 			ldir="$2"
 			shift 2 ;;
-		-u|--upper-dir)
+		-u|--rootfs-upper-dir)
 			udir="$2"
+			shift 2 ;;
+		-n|--use-nbd)
+			nbdpath="$2"
 			shift 2 ;;
 		-c|--container-id)
 			cid="$2"
@@ -100,16 +121,35 @@ done
 
 # Check required parameters
 emucon_check_required_arg '-w/--working-dir' "${workdir}"
-emucon_check_required_arg '-l/--lower-dir' "${ldir}"
-emucon_check_required_arg '-u/--upper-dir' "${udir}"
+emucon_check_required_arg '-t/--rootfs-type' "${fstype}"
 emucon_check_required_arg '-c/--container-id' "${cid}"
+case "${fstype}" in
+	tree)
+		emucon_check_required_arg '-i/--rootfs-dir' "${fsdir}"
+		emucon_ensure_dir_exists "${fsdir}"
+		;;
+	qcow)
+		emucon_check_required_arg '-i/--rootfs-image' "${fsimage}"
+		emucon_ensure_file_exists "${fsimage}"
+		;;
+	overlay)
+		emucon_check_required_arg '-l/--rootfs-lower-dir' "${ldir}"
+		emucon_check_required_arg '-u/--rootfs-upper-dir' "${udir}"
+		emucon_ensure_dir_exists "${udir}"
+		for dir in $(echo "${ldir}" | tr ':' '\n') ; do
+			emucon_ensure_dir_exists "${dir}"
+		done
+		;;
+	*)
+		emucon_print_error "Invalid rootfs-type: ${fstype}"
+		emucon_abort -v
+		;;
+esac
 
-# Check directories
 emucon_ensure_dir_exists "${workdir}"
-emucon_ensure_dir_exists "${udir}"
-for dir in $(echo "${ldir}" | tr ':' '\n') ; do
-	emucon_ensure_dir_exists "${dir}"
-done
+
+readonly user=$(id --user --name)
+readonly group=$(id --group --name)
 
 # Interactive mode
 if [ "${interactive:=y}" = 'y' ] ; then
@@ -121,10 +161,29 @@ fi
 
 emucon_print_info "Preparing working directory: ${workdir}"
 cd "${workdir}"
-mdir="${workdir}/rootfs"
-wdir="${workdir}/workfs"
-mkdir -p "${mdir}"
-mkdir -p "${wdir}"
+case "${fstype}" in
+	qcow)
+		fsdir="${workdir}/rootfs"
+		mkdir -v -p "${fsdir}"
+		if [ -n "${nbdpath}" ] ; then
+			rawdir="${nbdpath}"
+		else
+			rawdir="${workdir}/raw"
+			mkdir -v -p "${rawdir}"
+		fi
+
+		emucon-qcow mount --fs-type ext4 --fs-path "${fsdir}" "${fsimage}" "${rawdir}" || emucon_abort -v
+		;;
+	overlay)
+		fsdir="${workdir}/rootfs"
+		wdir="${workdir}/workfs"
+		mkdir -v -p "${fsdir}" "${wdir}"
+
+		emucon_print_info 'Setting up overlayfs...'
+		mopts="lowerdir=${ldir},upperdir=${udir},workdir=${wdir}"
+		sudo ${sopts} -- mount -t overlay overlay -o ${mopts} "${fsdir}" || emucon_abort -v
+		;;
+esac
 
 # Helper, responsible for cleanup
 __cleanup()
@@ -133,18 +192,33 @@ __cleanup()
 	exitcode="$?"
 
 	emucon_print_info 'Cleaning up working directory...'
-	sudo ${sopts} -- umount -v "${mdir}"
-	if [ "${cleanup}" = 'y' ] ; then
-		# Remove working-dir
-		sudo ${sopts} -- rm -v -r "${workdir}"
-	else
-		# Remove only created files/dirs
-		sudo ${sopts} -- rm -v -r "${mdir}"
-		sudo ${sopts} -- rm -v -r "${wdir}"
+	case "${fstype}" in
+		qcow)
+			emucon-qcow unmount --fs-path "${fsdir}" "${rawdir}"
+			if [ ! "${cleanup}" = 'y' ] ; then
+				# Remove only created files/dirs
+				sudo ${sopts} -- rm -v -r "${fsdir}"
+				if [ -z "${nbdpath}" ] ; then
+					sudo ${sopts} -- rm -v -r "${rawdir}"
+				fi
+			fi
+			;;
+		overlay)
+			sudo ${sopts} -- umount -v "${fsdir}"
+			if [ ! "${cleanup}" = 'y' ] ; then
+				# Remove only created files/dirs
+				sudo ${sopts} -- rm -v -r "${fsdir}" "${wdir}"
 
-		# Update owner of files in the COW-layer,
-		# since some of them may be created by root 
-		sudo ${sopts} chown --recursive "${user}:${group}" "${udir}"
+				# Update owner of files in the COW-layer,
+				# since some of them may be created by root
+				sudo ${sopts} chown --recursive "${user}:${group}" "${udir}"
+			fi
+			;;
+	esac
+
+	if [ "${cleanup}" = 'y' ] ; then
+		# Remove whole working-dir
+		sudo ${sopts} -- rm -v -r "${workdir}"
 	fi
 
 	# Return the process' exit-code
@@ -153,13 +227,6 @@ __cleanup()
 
 # Setup an exit-trap
 trap __cleanup EXIT
-
-readonly user=$(id --user --name)
-readonly group=$(id --group --name)
-
-emucon_print_info 'Setting up overlayfs...'
-mopts="lowerdir=${ldir},upperdir=${udir},workdir=${wdir}"
-sudo ${sopts} -- mount -t overlay overlay -o ${mopts} "${mdir}" || emucon_abort -v
 
 # Start a new container or restore from checkpoint?
 if [ -z "${checkpoint}" ] ; then
