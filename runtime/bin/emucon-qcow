@@ -1,0 +1,57 @@
+#!/bin/sh
+
+__cmd_name=$(basename $0)
+
+
+# ========== Helper Functions ==========
+
+__print_usage() {
+	cat <<- EOT
+	USAGE:
+	    ${__cmd_name} <subcommand> [<option>...]
+
+	DESCRIPTION:
+	    Helper tool for qcow-image handling.
+
+	COMMANDS:
+	    create:   Creates a new qcow-image
+	    mkfs:     Creates a new filesystem on specified qcow-image
+	    mount:    Mounts a qcow-image
+	    unmount:  Un-mounts a qcow-image
+
+	EOT
+}
+
+__to_mounted_image_path() {
+	local imgpath="$1"
+	local mntpath="$2"
+	local imgname
+	imgname=$(basename "${imgpath}")
+	echo "${mntpath}/${imgname%.*}.dd"
+}
+
+
+# ========== Script's Begin ==========
+
+. emucon-init.sh
+
+if [ $# -eq 0 ] || [ "$1" = '-h' ] || [ "$1" = '--help' ] ; then
+	__print_usage
+	emucon_exit
+fi
+
+cmd="$1"
+shift 1
+
+case "${cmd}" in
+	create|mkfs|mount|unmount)
+		if ! cmdimpl=$(emucon-paths "qcow-${cmd}.sh") ; then
+			emucon_print_error 'Subcommand implementation is missing!'
+			emucon_abort -v
+		fi
+		. "${cmdimpl}" ;;
+	*)
+		emucon_print_error "Invalid subcommand specified: ${cmd}"
+		emucon_abort -v ;;
+esac
+

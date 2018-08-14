@@ -76,7 +76,7 @@ done
 
 # Look up requested path
 case "$1" in
-	helpers.sh)
+	helpers.sh|qcow-create.sh|qcow-mkfs.sh|qcow-mount.sh|qcow-unmount.sh)
 		path="${impldir}/$1" ;;
 	sudoers.template)
 		path="${sharedir}/$1" ;;
