@@ -36,18 +36,26 @@ emucon_print_info()
 
 emucon_print_warning()
 {
-	# Output in yellow color!
-	tput setaf 3
-	emucon_print_info "$@"
-	tput sgr0
+	if [ -n "${TERM}" ] ; then
+		# Output in yellow color!
+		tput setaf 3
+		emucon_print_info "$@"
+		tput sgr0
+	else
+		emucon_print_info "$@"
+	fi
 }
 
 emucon_print_error()
 {
-	# Output in red color!
-	tput setaf 1
-	emucon_print_info "$@" >&2
-	tput sgr0
+	if [ -n "${TERM}" ] ; then
+		# Output in red color!
+		tput setaf 1
+		emucon_print_info "$@" >&2
+		tput sgr0
+	else
+		emucon_print_info "$@" >&2
+	fi
 }
 
 emucon_print_invalid_cmdargs_error()
