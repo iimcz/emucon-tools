@@ -191,6 +191,11 @@ __cleanup()
 	# Save current exit-code
 	exitcode="$?"
 
+	if sudo ${sopts} -- runc list | grep "${cid}" ; then
+		emucon_print_info "Stopping container ${cid}..."
+		sudo ${sopts} -- runc kill "${cid}" TERM
+	fi
+
 	emucon_print_info 'Cleaning up working directory...'
 	case "${fstype}" in
 		qcow)
