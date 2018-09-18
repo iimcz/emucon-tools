@@ -17,6 +17,7 @@ __print_usage()
 	ARGUMENTS:
 	    <name>
 	        The name of the tool to build:
+	            image-tools - OCI image-tools
 	            runtime-tools - OCI runtime-tools
 	            runc - OCI runc-tool
 
@@ -67,13 +68,13 @@ done
 # Tools to build
 tools="$@"
 if [ -z "${tools}" ] ; then
-	tools='runtime-tools runc'
+	tools='image-tools runtime-tools runc'
 	emucon_print_warning "No tools specified! Building all: ${tools}"
 else
 	# Check tool names
 	for tool in ${tools} ; do
 		case "${tool}" in
-			runtime-tools|runc)
+			image-tools|runtime-tools|runc)
 				# Valid name
 				;;
 			*)
@@ -87,7 +88,7 @@ emucon_check_required_arg '-o/--output-dir' "${outdir}"
 emucon_ensure_dir_exists "${outdir}"
 
 # Docker args
-image='ubuntu:16.04'
+image='ubuntu:18.04'
 dstdir='/emucon-scripts'
 scriptvol="$(emucon_get_current_dir)/scripts:${dstdir}:ro"
 outvol="${outdir}:/emucon-output"
