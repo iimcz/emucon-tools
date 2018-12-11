@@ -16,14 +16,6 @@ __list_nics() {
 	ls "$1" | grep 'nic'
 }
 
-__generate_vdehub_unit() {
-	local sockdir="$1"
-	cat <<- EOF
-		#!/bin/sh
-		exec vde_switch -hub -s "${sockdir}"
-	EOF
-}
-
 
 # ========== Script's Begin ==========
 
@@ -64,15 +56,11 @@ fi
 #
 # SEE:  https://github.com/phusion/baseimage-docker#running-scripts-during-container-startup
 
-echo 'Generating vde-hub units...'
+echo 'Starting vde-hub processes...'
 for nic in $(__list_nics "${nicsdir}") ; do
 	nicpath="${nicsdir}/${nic}"
-	nicunit="/etc/service/${nic}"
-	runner="${nicunit}/run"
-	mkdir -p "${nicunit}"
-	__generate_vdehub_unit "${nicpath}" > "${runner}"
-	chmod a=rx "${runner}"
-	echo "==> DONE: ${nicunit}"
+	vde_switch -hub -s "${nicpath}" -d
+	echo "==> DONE: ${nicpath}"
 done
 
 # Hand over to the actual init-system, as described in:
