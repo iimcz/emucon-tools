@@ -48,6 +48,9 @@ __print_usage()
 	    --enable-kvm
 	        Enable KVM device inside container.
 
+            --workdir
+                Set working dir
+
 	ARGUMENTS:
 	    <command>
 	        Command to execute inside container.
@@ -164,7 +167,7 @@ emucon_ensure_is_installed 'jq'
 
 # Parse script's command line arguments
 shortopts='h'
-longopts='output:,user-id:,group-id:,user-mapping:,group-mapping:,env:,mount:,mask:,rootfs:,rootfs-readonly,enable-kvm,help'
+longopts='output:,user-id:,group-id:,user-mapping:,group-mapping:,env:,mount:,mask:,rootfs:,workdir:,rootfs-readonly,enable-kvm,help'
 cmdargs=$(emucon_parse_cmdargs -s "${shortopts}" -l "${longopts}" -- "$@")
 if emucon_cmd_failed ; then
 	emucon_abort
@@ -211,6 +214,9 @@ while true ; do
 		--enable-kvm)
 			confargs="${confargs} $(__enable_kvm)"
 			shift 1 ;;
+                --workdir)
+                        confargs="${confargs} --process-cwd $2"
+			shift 2 ;;
 		-h|--help)
 			__print_usage
 			emucon_exit ;;
