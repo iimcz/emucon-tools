@@ -44,6 +44,9 @@ readonly deps="$(__print_dependencies)"
 apt-get install -y --allow-unauthenticated ${deps} ${emulators}
 apt-get autoremove
 
+__print_message 'Installing xpra deps...'
+pip install python-uinput
+
 __print_message 'Removing emulators...'
 apt-get remove -y --allow-unauthenticated ${emulators}
 
@@ -61,6 +64,20 @@ install -v -m 'a=rx' "${scripts}/emucon-starter" '/usr/bin/emucon-starter'
 
 # HACK: change apt-tool's user ID to root
 usermod --non-unique --uid 0 _apt
+
+# Add main user
+readonly uid='1000'
+addgroup --gid "${uid}" bwfla
+useradd -ms /bin/bash --uid "${uid}" --gid bwfla bwfla
+adduser bwfla xpra
+
+__print_message 'Update Xpra config...'
+sed -i '$s/$/ -nolisten local/' /etc/xpra/conf.d/55_server_x11.conf
+sed -i '$s/-auth *[^ ]*//' /etc/xpra/conf.d/55_server_x11.conf
+
+# Xpra runtime directory
+mkdir -p "/run/user/${uid}/xpra"
+chmod a=rwx "/run/user/${uid}/xpra"
 
 __print_message 'Cleaning up package manager...'
 apt-get clean

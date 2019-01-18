@@ -36,6 +36,8 @@ Cmnd_Alias RUNC_COMMANDS = {{install-dir}}/bin/runc --* run *, \
                            {{install-dir}}/bin/runc exec *, \
                            {{install-dir}}/bin/runc --* list *, \
                            {{install-dir}}/bin/runc list *, \
+                           {{install-dir}}/bin/runc --* list, \
+                           {{install-dir}}/bin/runc list, \
                            {{install-dir}}/bin/runc --* kill *, \
                            {{install-dir}}/bin/runc kill *
 

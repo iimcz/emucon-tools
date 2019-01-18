@@ -230,7 +230,15 @@ __cleanup()
 	exit "${exitcode}"
 }
 
-# Setup an exit-trap
+__on_termination()
+{
+	emucon_print_info "Stopping container ${cid}..."
+	sudo ${sopts} -- runc --debug kill "${cid}" TERM
+	exit
+}
+
+# Setup an traps
+trap __on_termination TERM
 trap __cleanup EXIT
 
 # Start a new container or restore from checkpoint?
