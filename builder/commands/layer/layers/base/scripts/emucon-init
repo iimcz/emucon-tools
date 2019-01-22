@@ -40,6 +40,9 @@ __wait_until_ready() {
 }
 
 __on_exit() {
+	echo 'Waiting for main process to terminate...'
+	wait "${mpid}"
+
 	echo 'Terminating background processes...'
 	kill -TERM -1
 
