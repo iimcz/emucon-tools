@@ -231,8 +231,8 @@ done
 
 confargs="${confargs} --rootfs-path ${rootfs}"
 
-__print_message 'Removing network-namespace...'
-confargs="${confargs} --linux-namespace-remove network"
+__print_message 'Adding network-namespace...'
+confargs="${confargs} --linux-namespace-add network"
 
 # Add user/group for the main-process
 if [ -n "${userid}" ] ; then

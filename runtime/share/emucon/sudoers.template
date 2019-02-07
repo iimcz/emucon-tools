@@ -39,7 +39,9 @@ Cmnd_Alias RUNC_COMMANDS = {{install-dir}}/bin/runc --* run *, \
                            {{install-dir}}/bin/runc --* list, \
                            {{install-dir}}/bin/runc list, \
                            {{install-dir}}/bin/runc --* kill *, \
-                           {{install-dir}}/bin/runc kill *
+                           {{install-dir}}/bin/runc kill *, \
+                           {{install-dir}}/bin/runc --* ps *, \
+                           {{install-dir}}/bin/runc ps *
 
 
 {{user}}  ALL = NOPASSWD: MOUNT_COMMANDS, RUNC_COMMANDS, RM_COMMANDS, CHOWN_COMMANDS
