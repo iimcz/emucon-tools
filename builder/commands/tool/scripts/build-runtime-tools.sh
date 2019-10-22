@@ -5,7 +5,7 @@
 __print_message 'Downloading OCI runtime-tools...'
 dstdir="${GOPATH}/src/github.com/opencontainers/runtime-tools"
 url='https://github.com/opencontainers/runtime-tools.git'
-tag='v0.4.0'
+tag='v0.9.0'
 mkdir -v -p "${dstdir}"
 cd "${dstdir}"
 git clone --depth 1 --branch "${tag}" "${url}" .
