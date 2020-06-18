@@ -209,7 +209,7 @@ while true ; do
 			confargs="${confargs} $(__to_mountarg 'bind' $2)"
 			shift 2 ;;
 		--mask)
-			confargs="${confargs} --linux-masked-paths $2"
+			confargs="${confargs} --linux-masked-paths $(escape "$2")"
 			shift 2 ;;
 		--rootfs)
 			rootfs="$2"
@@ -235,7 +235,7 @@ while true ; do
 	esac
 done
 
-confargs="${confargs} --rootfs-path ${rootfs}"
+confargs="${confargs} --rootfs-path $(escape "${rootfs}")"
 
 __print_message 'Adding network-namespace...'
 confargs="${confargs} --linux-namespace-add network"
@@ -243,9 +243,9 @@ confargs="${confargs} --linux-namespace-add network"
 # Add user/group for the main-process
 if [ -n "${userid}" ] ; then
 	__print_message 'Adding UID/GID for the main-process...'
-	confargs="${confargs} --process-uid ${userid}"
+	confargs="${confargs} --process-uid $(escape "${userid}")"
 	if [ -n "${groupid}" ] ; then
-		confargs="${confargs} --process-gid ${groupid}"
+		confargs="${confargs} --process-gid $(escape "${groupid}")"
 	fi
 fi
 
