@@ -5,6 +5,12 @@ __cmd_name=$(basename $0)
 
 # ========== Helper Functions ==========
 
+escape()
+{
+    set -- "$(printf "%s." "$1" | sed "s/'/'\\\\''/g")"
+    printf "'%s'\n" "${1%.}"
+}
+
 __print_usage()
 {
 	cat <<- EOT
@@ -178,14 +184,14 @@ confargs='--hostname emucon'
 rootfs="rootfs"
 
 # Lookup parsed parameters and their arguments
-eval set -- ${cmdargs}
+eval set -- "${cmdargs}"
 while true ; do
 	case "$1" in
 		--output)
 			outfile="$2"
 			shift 2 ;;
 		--env)
-			confargs="${confargs} --env $2"
+			confargs="${confargs} --env $(escape "$2")"
 			shift 2 ;;
 		--user-id)
 			userid="$2"
@@ -203,7 +209,7 @@ while true ; do
 			confargs="${confargs} $(__to_mountarg 'bind' $2)"
 			shift 2 ;;
 		--mask)
-			confargs="${confargs} --linux-masked-paths $2"
+			confargs="${confargs} --linux-masked-paths $(escape "$2")"
 			shift 2 ;;
 		--rootfs)
 			rootfs="$2"
@@ -215,7 +221,7 @@ while true ; do
 			confargs="${confargs} $(__enable_kvm)"
 			shift 1 ;;
                 --workdir)
-                        confargs="${confargs} --process-cwd $2"
+                        confargs="${confargs} --process-cwd $(escape "$2")"
 			shift 2 ;;
 		-h|--help)
 			__print_usage
@@ -229,7 +235,7 @@ while true ; do
 	esac
 done
 
-confargs="${confargs} --rootfs-path ${rootfs}"
+confargs="${confargs} --rootfs-path $(escape "${rootfs}")"
 
 __print_message 'Adding network-namespace...'
 confargs="${confargs} --linux-namespace-add network"
@@ -237,9 +243,9 @@ confargs="${confargs} --linux-namespace-add network"
 # Add user/group for the main-process
 if [ -n "${userid}" ] ; then
 	__print_message 'Adding UID/GID for the main-process...'
-	confargs="${confargs} --process-uid ${userid}"
+	confargs="${confargs} --process-uid $(escape "${userid}")"
 	if [ -n "${groupid}" ] ; then
-		confargs="${confargs} --process-gid ${groupid}"
+		confargs="${confargs} --process-gid $(escape "${groupid}")"
 	fi
 fi
 
@@ -306,7 +312,7 @@ __print_message "Adding container's command..."
 confargs="${confargs} --process-no-new-privileges"
 for arg in "$@" ; do
 	# Add quotes around, possibly space-separated, arguments!
-	confargs="${confargs} --args '${arg}'"
+	confargs="${confargs} --args $(escape "$arg")"
 done
 
 # NOTES:
@@ -315,7 +321,7 @@ done
 
 __print_message 'Running config generator...'
 # Reparse ${confargs} expansion for correct args splitting!
-eval oci-runtime-tool --host-specific generate ${confargs} \
+eval oci-runtime-tool --host-specific generate "${confargs}" \
 	| jq 'del(.mounts[] | select(.destination == "/sys"))' \
 	| jq 'del(.linux.seccomp)' \
 	| __forward "${outfile}" \
