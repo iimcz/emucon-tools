@@ -51,6 +51,12 @@ __print_usage()
 	    --rootfs-readonly
 	        Make container's rootfs readonly.
 
+	    --enable-extensive-caps
+	        Enable extensive capabilites. Container should run in a VM.
+
+	    --disable-network-namespace
+	        Disable network namespace. Container should run in a VM.
+
 	    --enable-kvm
 	        Enable KVM device inside container.
 
@@ -173,7 +179,7 @@ emucon_ensure_is_installed 'jq'
 
 # Parse script's command line arguments
 shortopts='h'
-longopts='output:,user-id:,group-id:,user-mapping:,group-mapping:,env:,mount:,mask:,rootfs:,workdir:,rootfs-readonly,enable-kvm,help'
+longopts='output:,user-id:,group-id:,user-mapping:,group-mapping:,env:,mount:,mask:,rootfs:,workdir:,rootfs-readonly,enable-kvm,enable-extensive-caps,disable-network-namespace,help'
 cmdargs=$(emucon_parse_cmdargs -s "${shortopts}" -l "${longopts}" -- "$@")
 if emucon_cmd_failed ; then
 	emucon_abort
@@ -217,6 +223,12 @@ while true ; do
 		--rootfs-readonly)
 			confargs="${confargs} --rootfs-readonly"
 			shift 1 ;;
+		--enable-extensive-caps)
+			confargs="${confargs} --process-cap-add CAP_NET_BROADCAST,CAP_SYS_RESOURCE,CAP_SYS_ADMIN,CAP_NET_ADMIN,CAP_CHOWN,CAP_DAC_OVERRIDE,CAP_FOWNER,CAP_FSETID,CAP_KILL,CAP_SETGID,CAP_SETUID,CAP_SETPCAP,CAP_NET_BIND_SERVICE,CAP_NET_RAW,CAP_SYS_CHROOT,CAP_MKNOD,CAP_AUDIT_WRITE,CAP_SETFCAP"
+			shift 1 ;;
+		--disable-network-namespace)
+			disablenetworknamespace="1"
+			shift 1 ;;
 		--enable-kvm)
 			confargs="${confargs} $(__enable_kvm)"
 			shift 1 ;;
@@ -237,8 +249,13 @@ done
 
 confargs="${confargs} --rootfs-path $(escape "${rootfs}")"
 
-__print_message 'Adding network-namespace...'
-confargs="${confargs} --linux-namespace-add network"
+if [ -n "${disablenetworknamespace}" ] ; then
+	__print_message 'Removing network-namespace...'
+	confargs="${confargs} --linux-namespace-remove network"
+else
+	__print_message 'Adding network-namespace...'
+	confargs="${confargs} --linux-namespace-add network"
+fi
 
 # Add user/group for the main-process
 if [ -n "${userid}" ] ; then
