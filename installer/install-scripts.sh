@@ -125,5 +125,5 @@ if [ ! -w "${sudodir}" ] ; then
 	cmdprefix='sudo'
 fi
 
-${cmdprefix} install -v -m 440 "${sudotmp}" "${sudodir}" || emucon_abort
-
+# TODO: skip installing it for now! A different solution is needed!
+#${cmdprefix} install -v -m 440 "${sudotmp}" "${sudodir}" || emucon_abort
