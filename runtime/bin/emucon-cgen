@@ -93,7 +93,6 @@ __print_masked_paths()
 __print_readonly_paths()
 {
 	cat <<- EOL
-		/proc/asound
 		/proc/bus
 		/proc/fs
 		/proc/irq
