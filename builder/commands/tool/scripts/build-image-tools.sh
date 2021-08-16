@@ -5,7 +5,7 @@
 __print_message 'Downloading OCI image-tools...'
 dstdir="${GOPATH}/src/github.com/opencontainers/image-tools"
 url='https://github.com/opencontainers/image-tools.git'
-tag='v1.0.0-rc1'
+tag='v1.0.0-rc3'
 mkdir -v -p "${dstdir}"
 cd "${dstdir}"
 git clone --depth 1 --branch "${tag}" "${url}" .
