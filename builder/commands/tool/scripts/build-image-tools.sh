@@ -11,7 +11,9 @@ cd "${dstdir}"
 git clone --depth 1 --branch "${tag}" "${url}" .
 
 __print_message 'Building OCI image-tools...'
-make
+go mod init
+go mod vendor
+make tool man
 
 __print_message 'Installing OCI image-tools...'
 make install PREFIX="${HOME}/.local" BINDIR="${GOBIN}"
