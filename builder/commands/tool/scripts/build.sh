@@ -1,5 +1,7 @@
 #!/bin/sh
 
+set -e
+
 __print_message()
 {
 	echo "[container] $1"

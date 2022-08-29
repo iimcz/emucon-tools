@@ -12,6 +12,7 @@ git clone --depth 1 --branch "${tag}" "${url}" .
 
 __print_message 'Building OCI runtime-tools...'
 go mod init
+go mod tidy
 go mod vendor
 make tool man
 
