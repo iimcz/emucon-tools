@@ -162,6 +162,17 @@ __enable_kvm()
 	echo -n "--linux-device-cgroup-add 'allow,type=c,major=10,minor=232,access=rwm'"
 }
 
+__enable_passthrough_device()
+{
+	echo -n "--linux-device-add '$1' "
+
+	type=$(echo $1 | cut -d: -f1)
+	major=$(echo $1 | cut -d: -f2)
+	minor=$(echo $1 | cut -d: -f3)
+
+	echo -n "--linux-device-cgroup-add 'allow,type=${type},major=${major},minor=${minor},access=rwm' "
+}
+
 
 # ========== Script's Begin ==========
 
@@ -231,8 +242,11 @@ while true ; do
 		--enable-kvm)
 			confargs="${confargs} $(__enable_kvm)"
 			shift 1 ;;
-                --workdir)
-                        confargs="${confargs} --process-cwd $(escape "$2")"
+        --workdir)
+            confargs="${confargs} --process-cwd $(escape "$2")"
+			shift 2 ;;
+		--add-device)
+			confargs="${confargs} $(__enable_passthrough_device "$2")"
 			shift 2 ;;
 		-h|--help)
 			__print_usage
