@@ -60,8 +60,17 @@ __print_usage()
 	    --enable-kvm
 	        Enable KVM device inside container.
 
-            --workdir
-                Set working dir
+        --workdir
+            Set working dir
+		
+		--add-device <type:major:minor:path>
+			Add a linux device to the config
+		
+		--memlock-limit <bytes>
+			Set the container process' memlock hard and soft limits to <bytes>
+		
+		--add-usb-cgroup
+			Add cgroup allow settings for USB devices (major 180 and 189)
 
 	ARGUMENTS:
 	    <command>
@@ -166,11 +175,22 @@ __enable_passthrough_device()
 {
 	echo -n "--linux-device-add '$1' "
 
-	type=$(echo $1 | cut -d: -f1)
-	major=$(echo $1 | cut -d: -f2)
-	minor=$(echo $1 | cut -d: -f3)
+	local type=$(echo $1 | cut -d: -f1)
+	local major=$(echo $1 | cut -d: -f2)
+	local minor=$(echo $1 | cut -d: -f3)
 
 	echo -n "--linux-device-cgroup-add 'allow,type=${type},major=${major},minor=${minor},access=rwm' "
+}
+
+__set_memlock_limit()
+{
+	echo -n "--process-rlimits-add=RLIMIT_MEMLOCK:${1}:${1}"
+}
+
+__add_usb_cgroup()
+{
+	echo -n "--linux-device-cgroup-add 'allow,type=c,major=180,access=rwm' "
+	echo -n "--linux-device-cgroup-add 'allow,type=c,major=189,access=rwm' "
 }
 
 
@@ -189,7 +209,7 @@ emucon_ensure_is_installed 'jq'
 
 # Parse script's command line arguments
 shortopts='h'
-longopts='output:,user-id:,group-id:,user-mapping:,group-mapping:,env:,mount:,mask:,rootfs:,workdir:,rootfs-readonly,enable-kvm,enable-extensive-caps,disable-network-namespace,help'
+longopts='output:,user-id:,group-id:,user-mapping:,group-mapping:,env:,mount:,mask:,rootfs:,workdir:,rootfs-readonly,enable-kvm,enable-extensive-caps,disable-network-namespace,help,add-device:,memlock-limit:,add-usb-cgroup'
 cmdargs=$(emucon_parse_cmdargs -s "${shortopts}" -l "${longopts}" -- "$@")
 if emucon_cmd_failed ; then
 	emucon_abort
@@ -242,12 +262,19 @@ while true ; do
 		--enable-kvm)
 			confargs="${confargs} $(__enable_kvm)"
 			shift 1 ;;
-        --workdir)
-            confargs="${confargs} --process-cwd $(escape "$2")"
+		--workdir)
+			confargs="${confargs} --process-cwd $(escape "$2")"
 			shift 2 ;;
 		--add-device)
+			needsys=true
 			confargs="${confargs} $(__enable_passthrough_device "$2")"
 			shift 2 ;;
+		--memlock-limit)
+			confargs="${confargs} $(__set_memlock_limit "$2")"
+			shift 2 ;;
+		--add-usb-cgroup)
+			confargs="${confargs} $(__add_usb_cgroup)"
+			shift 1 ;;
 		-h|--help)
 			__print_usage
 			emucon_exit ;;
@@ -351,8 +378,13 @@ done
 
 __print_message 'Running config generator...'
 # Reparse ${confargs} expansion for correct args splitting!
+
+# TODO: decide how to handle issues with user-namespaces when /sys
+# is mounted as we need it for GPU passthrough. The following is removed
+# from the eval below.
+#	| jq 'del(.mounts[] | select(.destination == "/sys"))' \
+
 eval oci-runtime-tool --host-specific generate "${confargs}" \
-	| jq 'del(.mounts[] | select(.destination == "/sys"))' \
 	| jq 'del(.linux.seccomp)' \
 	| __forward "${outfile}" \
 	|| emucon_abort -v
