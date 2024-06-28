@@ -384,8 +384,14 @@ __print_message 'Running config generator...'
 # from the eval below.
 #	| jq 'del(.mounts[] | select(.destination == "/sys"))' \
 
+# NAKI NOTES:
+#    - Add user umask of 0 to allow other processes to communicate with qemu,
+#      since the eaas process has different uid than the container process.
+#      This should only be temporary until a better solution presents itself.
+
 eval oci-runtime-tool --host-specific generate "${confargs}" \
 	| jq 'del(.linux.seccomp)' \
+	| jq '. * {process: {user: {umask: 0}}}' \
 	| __forward "${outfile}" \
 	|| emucon_abort -v
 
